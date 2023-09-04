@@ -2,9 +2,7 @@
 # ======================================================================================================================
 # run freesurfer, the watershed algorithm (needed by mne to compute headmodel)
 # $1 subject id
-
-# e.g. /mnt/storage/tier2/robbot/ProjectData/MEGRID/prg/03_doFsWatershed.sh 19820925PEGA
-
+# @author: giuliano giari, giuliano.giari@gmail.com
 # ======================================================================================================================
 
 function fs_watershed () {

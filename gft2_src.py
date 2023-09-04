@@ -1,6 +1,6 @@
 """
 functions to create source space
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import glob
@@ -94,6 +94,10 @@ def make_forward(sub_id, ses_id, opt_local, info=None):
         fwd_ = mne.make_forward_solution(info, trans_fname, src_fname, bem_fname, meg=True)
         mne.write_forward_solution(fwd_fname, fwd_)
 
+    # select only one sensor type, if necessary
+    if opt_local['stc_ch_type'] != 'meg':
+        fwd_ = mne.pick_types_forward(fwd_, meg=opt_local['stc_ch_type'])
+        
     return fwd_
 
 

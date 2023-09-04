@@ -4,10 +4,8 @@
 # apply maxfilter to the raw data removing channels identified in previous step
 # additionally it moves the data to the reference run
 # and then transfers all the data to the maxfilter folder
-
-# -- options --
-# e.g. /mnt/storage/tier2/robbot/ProjectData/MEGRID/prg/analysis/04_doMaxFilter.sh
-
+#
+# @author: giuliano giari, giuliano.giari@gmail.com
 # ======================================================================================================================
 
 function doMaxFilter () {

@@ -1,6 +1,7 @@
 """
 functions for frequency analysis
-@author: giulianogiari
+
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import glob

@@ -1,3 +1,5 @@
+# @author: giuliano giari, giuliano.giari@gmail.com
+
 # define packages -------------------
 
 library(tidyverse)
@@ -13,13 +15,14 @@ params.stc_cov_data = 'noise'
 params.stc_cov_method = 'empirical'
 params.src_type = 'vol'
 params.metric = 'coh'
+params.ch_type = 'meg'
 
 #params.stcPath <- '/Volumes/Projects/MEGRID/gft2/pilot_v2/derivatives/stc/'
 params.stcPath <- paste('/Users/giulianogiari/Desktop/gridft2/pilot_v2/derivatives/stc/', sep='')
 
 # load data and append in a big df -------------------
 ses_csv_flist <- Sys.glob(paste(params.stcPath, 'ses-*_ROI_desc-', params.stc_method, '-', params.stc_out, '-',
-                                params.src_type, '-', params.metric, '.csv', sep=''))
+                                params.src_type, '-', params.metric, '-', params.ch_type, '.csv', sep=''))
 
 for (i_csv in 1 : length(ses_csv_flist)) {
   # load the csv file

@@ -1,6 +1,7 @@
 """
 functions for preprocessing
-@author: giulianogiari
+
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import glob

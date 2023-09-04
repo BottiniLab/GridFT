@@ -1,6 +1,7 @@
 """
 configuration settings for gridft2 study
-@author: giulianogiari
+
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 # ------------------------------------------------- initialization --------------------------------------------------- #
@@ -107,7 +108,6 @@ opt['lp'] = 40
 # epochs
 opt['tmin'] = -0.5 # s
 opt['tmax'] = 44 # s
-opt['empty_len'] = 'all' # all or trial, the duration of the emtpy room recording that will be considered
 opt['diode_tolerance'] = 150  # samples
 opt['reject_trls'] = True
 opt['realign_trj'] = True
@@ -167,6 +167,8 @@ opt['eye_chan'] = {'RX': 'MISC001',  # (Right eye, X axis)',
 # x is fixationWindow(1) and fixationWindow(3)
 # while y is fixationWindow(2) and fixationWindow(4)
 opt['fixWin'] = [608.3400, 429.0700, 831.6600, 650.9300]
+# opt['fixWin'] = [695, 515, 744, 564] # 1 deg
+opt['fixWinSize'] = 4.5
 opt['fixation_thresh'] = .8
 opt['hmap_method'] = 'kde'
 opt['hmap_downsampling'] = 1

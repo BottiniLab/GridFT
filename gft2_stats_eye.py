@@ -1,6 +1,7 @@
 """
 functions for statistical analyses of eye tracker data
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
+
 """
 
 import matplotlib.pyplot as plt
@@ -441,5 +442,128 @@ def eye_meg_correlation(opt_local):
         ax[i_ang].legend()
     plt.setp(ax, xlabel="Grid-like effect", ylabel="Spatial gaze modulation")
     fig.savefig(f"{opt_local['figPath']}eye-meg_correlation.png", dpi=500, bbox_inches='tight')
+
+
+def circular_statistics(opt_local):
+    """
+    Compute circular statistics to compare angles of fixations
+    :param ses_id:
+    :param opt_local:
+    :return:
+    """
+    fig_r, ax_r = plt.subplots(1, 2, figsize=(10, 3))
+    eye_df = {k: [] for k in ['sub_id', 'ang_res', 'ses_id', 'slope']}
+    for ses_id in ['dots', 'lines']:
+        # load the data
+        df = pd.DataFrame()
+        for sub_id in opt_local['exp_1']['subj_list']:
+            if sub_id in opt_local['exp_1']['to_exclude']: continue
+            df = pd.concat([df, pd.read_csv(f"{opt_local['eyePath']}{sub_id}_ses-{ses_id}_hist_D.csv")])
+
+        df.reset_index(inplace=True, drop=True)
+        # --------- plot the average V ---------- #
+        tmp = df.groupby(['sub_id', 'ang_res']).mean().reset_index()
+        print(ses_id, tmp.groupby(['ang_res']).mean()['D'],
+              tmp.groupby(['ang_res']).std()['D'])
+        # plot the correlation
+        fig, ax = plt.subplots(1, 1, figsize=(4, 3))
+        ax = raincloud(tmp, x='ang_res', y='D', order=[15, 30], ax=ax,
+                       palette=opt_local['colors']['beh'][ses_id][1:])
+        ax.set_xlabel('Angular resolution (°)')
+        ax.set_ylabel('V')
+        ax.set_title(f"{ses_id.title()} session")
+        fig.tight_layout()
+        fig.savefig(f"{opt_local['figPath']}ses-{ses_id}_hist_V.png", pad_inches=0, bbox_inches='tight',
+                    transparent=True, dpi=500)
+
+        # ---------  correlate V with angular difference ---------- #
+        from matplotlib.ticker import FormatStrFormatter
+
+        # plot
+        for i, ang_res in enumerate(opt_local['ang_res']):
+            df_ang = df.loc[df['ang_res'] == ang_res]
+            print(ang_res, df_ang.groupby('sub_id').mean()['D'].mean(),
+                  df_ang.groupby('sub_id').mean()['D'].std())
+            im = sns.regplot(data=df_ang.groupby(['ang_diff', 'ang_1', 'ang_2']).mean().reset_index(),
+                             x="ang_diff", y="D", ax=ax_r[i],
+                             scatter_kws={'edgecolor': 'k', 'color': opt_local['colors']['beh'][ses_id][i + 1],
+                                          's': 30, 'alpha': .5},
+                             line_kws={'color': opt_local['colors']['beh'][ses_id][i + 1]})
+            # set the yticks to 4 decimals
+            im.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+            im.set_title(f"{ang_res}° resolution")
+            # compute correlation between heatmaps correlation and angular difference
+            r = []
+            for sub_id in df_ang.sub_id.unique():
+                sub_df = df_ang.loc[df_ang['sub_id'] == sub_id]
+                r.append(stats.pearsonr(sub_df['ang_diff'], sub_df['D'])[0])
+            # test against zero
+            t, p = stats.ttest_1samp(np.arctanh(r), 0)
+            print(f"Correlation between V and angular difference: {np.mean(r)} ± {np.std(r)}")
+            print(f"t({len(r) - 1}) = {t}, p = {p}")
+        plt.setp(ax_r, xlabel='Angular difference (°)', ylabel='V')
+
+        # -------- compute slope of the eye tracker modulation, to be used later -------- #
+        # load the data from the eye tracking
+        for sub_id in opt_local['exp_1']['subj_list']:
+            if not sub_id in opt_local['exp_1']['to_exclude']:
+                csv = pd.read_csv(f"{opt_local['eyePath']}{sub_id}_ses-{ses_id}_hist_D.csv")
+                for ang_res in csv.ang_res.unique():
+                    # select data of this ang_res
+                    csv_ang = csv[csv['ang_res'] == ang_res]
+                    # compute correlation and slope
+                    _, _, model = linear_fit(csv_ang['ang_diff'].values, csv_ang['D'].values)
+                    # compute correlation and slope using scipy
+                    eye_df['sub_id'].append(sub_id)
+                    eye_df['ang_res'].append(ang_res)
+                    eye_df['ses_id'].append(ses_id)
+                    eye_df['slope'].append(model.params[1])
+    # save figure
+    fig_r.tight_layout()
+    fig_r.savefig(f"{opt_local['figPath']}_polarHist_ang_corr.png", dpi=500, bbox_inches='tight')
+
+    # -------- compare V with meg grid-like effect -------- #
+    # read the meg data
+    _, _, roi_df = _average_ses_roi('dots', 'lines', 'coh', opt_local)
+    # select the data in the MTL roi
+    roi_df = roi_df[roi_df['roi'] == 'MTL']
+    # compute slopes in the MTL for each subject
+    meg_df = {k: [] for k in ['sub_id', 'ang_res', 'hemi', 'slope']}
+    for sub_id in roi_df.sub_id.unique():
+        sub_df = roi_df[roi_df['sub_id'] == sub_id]
+        for ang_res in sub_df.ang_res.unique():
+            ang_df = sub_df[sub_df['ang_res'] == ang_res]
+            for hemi in ['lh', 'rh']:
+                hemi_df = ang_df[ang_df['hemi'] == hemi]
+                if ang_res == 15:
+                    mdl = quadratic_fit(hemi_df['fold'].values[:, None], hemi_df['coh'].values)[2]
+                else:
+                    mdl = linear_fit(hemi_df['fold'].values[:, None], hemi_df['coh'].values)[2]
+                meg_df['sub_id'].append(sub_id)
+                meg_df['ang_res'].append(ang_res)
+                meg_df['hemi'].append(hemi)
+                meg_df['slope'].append(mdl.params[1])
+    meg_df = pd.DataFrame.from_dict(meg_df)
+    eye_df = pd.DataFrame.from_dict(eye_df)
+    # average across sessions
+    eye_df = eye_df.groupby(['sub_id', 'ang_res']).mean().reset_index()
+    # merge eye_df and meg_df
+    df = pd.merge(meg_df, eye_df, on=['sub_id', 'ang_res'], suffixes=('_meg', '_eye'))
+    # compute correlation between slopes in MEG and slopes in eye tracking, separately for the hemi and ang_res
+    fig, ax = plt.subplots(1, 2, figsize=(10, 3))
+    for i_ang, ang_res in enumerate(df.ang_res.unique()):
+        for hemi in df.hemi.unique():
+            df_ang_hemi = df[(df['ang_res'] == ang_res) & (df['hemi'] == hemi)]
+            r, p = stats.pearsonr(df_ang_hemi['slope_meg'].values, df_ang_hemi['slope_eye'].values)
+            # plot the data
+            print(f"{ang_res} - {hemi}: r={r:.2f}, p={p:.3f}")
+            sns.regplot(x='slope_meg', y='slope_eye', data=df_ang_hemi, ax=ax[i_ang],
+                        color=opt_local['colors']['eye-grid'][hemi],
+                        label="Left Hemisphere" if hemi == 'lh' else "Right Hemisphere")
+        ax[i_ang].set_title(f"{ang_res}° resolution")
+        ax[i_ang].legend()
+    plt.setp(ax, xlabel="Grid-like effect", ylabel="Spatial gaze modulation")
+    fig.savefig(f"{opt_local['figPath']}eyeV-meg_correlation.png", dpi=500, bbox_inches='tight')
+
 
     

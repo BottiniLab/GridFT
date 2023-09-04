@@ -1,6 +1,6 @@
 """
 functions for source analysis
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import glob
@@ -36,7 +36,9 @@ def compute_noise_covariance(sub_id, ses_id, opt_local):
     # load data
     noise_fname = f"{opt_local['prePath']}{sub_id}_ses-{ses_id}_task-noise_raw.fif.gz"
     noise_ = mne.io.read_raw_fif(noise_fname, preload=True).pick_types(meg=True, eog=False)
-
+    # select only one channel type, if necessary
+    if opt_local['stc_ch_type'] != 'meg':
+        noise_.pick_types(meg=opt_local['stc_ch_type'])
     # define rank of the covariance matrix
     logging.getLogger('mne').info('reducing the rank of the covariance matrix before source analysis')
     rank_ = mne.compute_rank(noise_, rank='info')
@@ -88,7 +90,11 @@ def compute_fft_stc(sub_id, ses_id, opt_local):
                                                     epochs_event=realign_to_trj(epochs[f"ang_res_{ang_res}"],
                                                                                 opt_local['starting_trj'], opt_local
                                                                                 ))
-            epochs_event.pick_types(meg=True)
+            if opt_local['stc_ch_type'] == 'meg':
+                epochs_event.pick_types(meg=True)
+            else:
+                epochs_event.pick_types(meg=opt_local['stc_ch_type'])
+
 
             # compute data covariance
             data_cov = mne.compute_covariance(epochs_event.copy().apply_baseline((None, None)),

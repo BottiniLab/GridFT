@@ -1,6 +1,6 @@
 """
 functions for statistics on the frequency analysis
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import glob
@@ -118,7 +118,7 @@ def cluster_permutation_frq(ses_id, opt_local):
                 tail=opt_local['tail'],
                 threshold=threshold,
                 out_type='indices',
-                n_permutations=opt_local['num_perms'])
+                n_permutations=opt_local['n_perms'])
     # save
     with open(f"{opt_local['frqPath']}{ses_id}_tail-{opt_local['tail']}_perm-{opt_local['n_perms']}_cluster_test.p", 'wb') as f:
         pickle.dump(stat_res_sensor, f)

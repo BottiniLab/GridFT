@@ -1,6 +1,6 @@
 """
 utility functions
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import h5py

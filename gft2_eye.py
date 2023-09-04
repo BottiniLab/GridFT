@@ -1,14 +1,16 @@
 """
 functions for processing eye tracker
 
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import h5py
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+from astropy.stats import kuiper_two
 from gft2_utils import load_mat, resample_data, euclidean_distance, nearest
 from gft2_preprocessing import read_epochs
 from scipy.io import loadmat
@@ -633,5 +635,66 @@ def correlate_heatmaps(sub_id, ses_id, opt_local):
     #
     df = pd.DataFrame.from_dict(out_dict)
     df.to_csv(f"{opt_local['eyePath']}{sub_id}_ses-{ses_id}_hmap_corr.csv", index=False)
+
+
+def compare_angle_distributions(sub_id, ses_id, opt_local):
+    """
+    Compute gaze angle at each time point and compare distributions for the different trajectories
+    :return:
+    """
+    # load the data
+    eye_df = eye_preprocess(sub_id, ses_id, opt_local)
+    # remove fixations outside the fixation window
+    in_fixation = slice(int(opt_local['fixWin'][0]), int(opt_local['fixWin'][2])), \
+                  slice(int(opt_local['fixWin'][1]), int(opt_local['fixWin'][3]))
+    eye_df = eye_df.loc[(eye_df['xpr'] >= in_fixation[0].start) & (eye_df['xpr'] <= in_fixation[0].stop) &
+                        (eye_df['ypr'] >= in_fixation[1].start) & (eye_df['ypr'] <= in_fixation[1].stop)]
+    # compute angle of each fixation
+    eye_df['trj_angle'] = np.mod(eye_df['angle'], 180)
+    xCenter = 1440 // 2
+    yCenter = 1080 // 2
+    # compute angle of the eyes with respect to the center of the screen
+    angles = np.arctan2(eye_df['ypr'] - yCenter, eye_df['xpr'] - xCenter)
+    # convert values in the range [0, 2pi]
+    angles[angles < 0] = angles[angles < 0] + 2 * np.pi
+    eye_df['eye_angle'] = angles
+    # create output dictionary
+    out_dict = {k: [] for k in ['sub_id', 'ang_res', 'ang_1', 'ang_2', 'ang_diff', 'D']}
+    # loop over angular resolutions
+    for ang_res in opt_local['ang_res']:
+        # get data of this angular resolution
+        ang_df = eye_df.loc[(eye_df['ang_res'] == ang_res)].reset_index(drop=True)
+        angles_pair = np.array(list(itertools.combinations(sorted(ang_df.trj_angle.unique()), 2)))
+        for trj_angle1, trj_angle2 in angles_pair:
+            # get eye position
+            alpha1 = ang_df.loc[(ang_df['trj_angle'] == trj_angle1)].reset_index(drop=True)['eye_angle'].values
+            alpha2 = ang_df.loc[(ang_df['trj_angle'] == trj_angle2)].reset_index(drop=True)['eye_angle'].values
+            # kuiper test
+            D, fpp = kuiper_two(alpha1, alpha2)
+            # store output
+            out_dict['sub_id'].append(sub_id)
+            out_dict['ang_res'].append(ang_res)
+            out_dict['ang_1'].append(trj_angle1)
+            out_dict['ang_2'].append(trj_angle2)
+            ang_diff = np.mod(np.abs(trj_angle1 - trj_angle2), 180)
+            if ang_diff > 90:
+                # transform the angles difference to be between 0 and 90
+                out_dict['ang_diff'].append(180 - ang_diff)
+            else:
+                out_dict['ang_diff'].append(float(ang_diff))
+            out_dict['D'].append(D)
+    df = pd.DataFrame.from_dict(out_dict)
+    df.to_csv(f"{opt_local['eyePath']}{sub_id}_ses-{ses_id}_hist_D.csv", index=False)
+    # plot the correlation for the different angular resolutions
+    fig, ax = plt.subplots(1, 2, figsize=(10, 10))
+    for i, ang_res in enumerate([15, 30]):
+        df_ang = df.loc[(df['ang_res'] == ang_res)]
+        slope, intercept, r_value, p_value, std_err = stats.linregress(df_ang['D'], df_ang['ang_diff'])
+        # plot the linear regression model
+        ax[i].scatter(df_ang['D'], df_ang['ang_diff'])
+        ax[i].plot(df_ang['D'], intercept + slope * df_ang['D'], 'r', label=f'{ang_res}°')
+    plt.setp(ax, xlabel='Correlation', ylabel='Angular difference')
+    plt.suptitle(f"{sub_id} - {ses_id} {ang_res}° p:{p_value:.4f}")
+    fig.savefig(f"{opt_local['figPath']}{sub_id}_ses-{ses_id}_angleD_corr.png")
 
     

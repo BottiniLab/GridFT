@@ -1,6 +1,7 @@
 """
 functions for model fitting analyses
-@author: giulianogiari
+
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import matplotlib as mpl

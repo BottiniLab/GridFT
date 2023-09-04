@@ -1,21 +1,10 @@
- #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+ 
 """
-Created on Sat Jun  12 10:03:13 2021
+mark bad channels in raw continuous data using mne-python visualization tool.
+this outputs a text file, meant to be used with maxfilter in the meg server 
+this script is meant to be called as a function
 
-@author: giulianogiari
-
-========================================================================================================================
-# mark bad channels in raw continuous data using mne-python visualization tool.
-# this outputs a text file, meant to be used with maxfilter in the meg server and updates the bids dataset
-# this script is meant to be called as a function
-
-# options
-# $1 subject_id
-# $2 session_id
-# e.g. /Volumes/ProjectData/MEGRID/gft2/prg/analysis/util_markBadChannels.py 19870707JNWL dots
-========================================================================================================================
-
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import os
@@ -51,7 +40,7 @@ def check_badfile(bids_path):
 def markBadChannels(bids_path, butterflyFlag=False, lst_bad=[]):
     """
     1) check if the channels have already been marked. if so ask if we want to repeat the procedure
-    2) load the data, interactive plot to mark the channels. then save a text file and mark them as bad also in bids
+    2) load the data, interactive plot to mark the channels. then save a text file 
     """
 
     # 1)

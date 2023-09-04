@@ -1,6 +1,6 @@
 """
 functions for analysis of behavioral data
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import os

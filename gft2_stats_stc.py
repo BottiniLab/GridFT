@@ -1,6 +1,6 @@
 """
 functions for statistics at source level
-@author: giulianogiari
+@author: giuliano giari, giuliano.giari@gmail.com
 """
 
 import h5py
@@ -19,6 +19,8 @@ from mne.stats import permutation_cluster_1samp_test
 from gft2_stc import read_stc
 from gft2_utils import significance_bar
 from gft2_frequency import pick_frequency
+from nilearn.datasets import load_mni152_template
+from nilearn.image import resample_to_img
 
 
 def load_stc_data(ses_id, opt_local):
@@ -550,3 +552,80 @@ def conjunction(ses_id, p_thresh, alternative, opt_local):
                                 cut_coords=(30, -18, -25), cmap='Reds',
                                 draw_cross=False, dim=-.1, threshold=thresh, vmax=vmax)
     
+
+def cluster_permutation_test():
+    """
+    Cluster permutation test at source level
+    """
+    # load data
+    data_stc, connectivity, src_fs = load_stc_data(ses_id, metric, opt_local)
+    mask_ind = make_cortical_mask(opt_local)
+
+    # ----------------------------------------- cluster permutation test --------------------------------------------- #
+    stats_fname = f"{opt_local['stcPath']}stats_{ses_id}_{opt_local['stc_method']}_{opt_local['cluster_method']}_" \
+                  f"{opt_local['n_perms']}_{opt_local['p_thresh']}_{opt_local['src_type']}_{metric}_{opt_local['stc_ch_type']}.h5"
+
+    if os.path.isfile(stats_fname):
+        with open(stats_fname, 'rb') as f:
+            stat_res_stc = pickle.load(f)
+    else:
+        threshold = -stats.distributions.t.ppf(opt_local['p_thresh'] / 2.,
+                                               np.squeeze(data_stc[ses_id][15]['6']).shape[0] - 1)
+    
+        stat_res_stc = {ses_id: {str(ang_res): {} for ang_res in opt_local['ang_res']}}
+        for i_ang, ang_res in enumerate(opt_local['ang_res']):
+
+            f6 = np.array(data_stc[ses_id][ang_res]['6'])
+            if ang_res == 30:
+                fCont = np.array(data_stc[ses_id][ang_res]['4'])
+            else:
+                fCont = 0.5 * np.array(data_stc[ses_id][ang_res]['4']) + 0.5 * np.array(data_stc[ses_id][ang_res]['8'])
+
+            stat_res_stc[ses_id][str(ang_res)] = permutation_cluster_1samp_test(
+                f6-fCont, adjacency=connectivity, threshold=threshold, out_type='indices',
+                n_permutations=opt_local['n_perms'], n_jobs=-1, seed=0, exclude=mask_ind)
+        with open(stats_fname, 'wb') as f:
+            pickle.dump(stat_res_stc, f)
+
+    # get all t-scores to estimate the max values for the plotting scale
+    vmax = np.max(np.concatenate([v[0] for k, v in stat_res_stc[ses_id].items()]))
+    cortical_mask_ind = make_cortical_mask(opt_local)
+
+    # ----------------------------------------------------- plot ----------------------------------------------------- #
+    for i_ang, ang_res in enumerate(opt_local['ang_res']):
+        # get the stat results
+        t_obs, cluster_list, cluster_pval, h0 = stat_res_stc[ses_id][str(ang_res)]
+
+        data_to_plot = t_obs.copy()
+        data_to_plot[cortical_mask_ind] = 0
+        #
+        t = mne.VolSourceEstimate(data_to_plot.copy(), vertices=[src_fs[0]['vertno']],
+                                  tmin=0, tstep=0, subject='sub-fsaverage').as_volume(src_fs, dest='mri', format='nifti1')
+
+        cluster_mask = np.zeros_like(t_obs)
+        # find the index of the most significant cluster
+        good_cluster_ind = np.argmin(cluster_pval)
+        # find the index of the voxels in the cluster
+        vox_cluster_ind = cluster_list[good_cluster_ind][0]
+        # keep only significant voxels
+        cluster_mask[vox_cluster_ind] = 1
+        # make a nifti object
+        mask = mne.VolSourceEstimate(cluster_mask.copy(), vertices=[src_fs[0]['vertno']],
+                                     tmin=0, tstep=0, subject='sub-fsaverage').as_volume(src_fs, dest='mri',
+                                                                                         format='nifti1')
+        # remove the time dimension
+        mask = nib.Nifti1Image(mask.dataobj.squeeze(), mask.affine)
+        # load the template image and resample the stat image and the mask to the template
+        template = load_mni152_template(resolution=5)
+        resampled_t = resample_to_img(t, template, interpolation='nearest')
+        resampled_mask = resample_to_img(mask, template, interpolation='nearest')
+        # plot
+        display = plotting.plot_glass_brain(resampled_t, title=f"{ang_res}°", symmetric_cbar=True, colorbar=True, plot_abs=False,
+                                            vmax=vmax, vmin=-vmax, cmap=opt_local['colors']['topo'])
+        display.add_contours(resampled_mask, colors=['#35155D'], linewidths=2,
+                             levels=np.array([1]))
+
+        display.savefig(f"{opt_local['figPath']}cluster_{ses_id}_{opt_local['stc_method']}_"
+                        f"{opt_local['cluster_method']}_{ang_res}_{metric}_{opt_local['stc_ch_type']}.png", dpi=500)
+
+
